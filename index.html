@@ -102,6 +102,7 @@
         .study-progress, .study-controls { background: var(--surface-dark); padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; border: 1px solid var(--border-color); }
         .progress-bar { width: 100%; height: 8px; background: #444; border-radius: 4px; overflow: hidden; margin: 10px 0; }
         .progress-fill { height: 100%; background: linear-gradient(90deg, #4a90e2, #4caf50); width: 0%; transition: width 0.3s ease; }
+        .completion-controls-buttons { display: flex; gap: 15px; justify-content: center; margin-top: 10px; }
         
         .instructions { background: var(--surface-dark); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border-color); }
         .instructions ol { padding-left: 20px; }
@@ -110,16 +111,11 @@
         .hidden { display: none !important; }
         
         .fab-container { position: fixed; bottom: 20px; right: 20px; z-index: 999; }
-        .fab { width: 56px; height: 56px; border-radius: 50%; background-color: var(--secondary-color); color: white; border: none; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer; transition: background-color 0.3s ease, transform 0.2s ease; }
+        .fab { width: 56px; height: 56px; border-radius: 50%; background-color: var(--secondary-color); color: white; border: none; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: grab; transition: background-color 0.3s ease, transform 0.2s ease; user-select: none; }
         .fab:hover { transform: scale(1.05); }
         .fab.active { background-color: var(--primary-color); }
-        .fab svg { width: 24px; height: 24px; }
-
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
-        .modal-overlay:not(.hidden) { opacity: 1; pointer-events: auto; }
-        .modal-content { background: var(--surface-dark); padding: 30px; border-radius: 12px; text-align: center; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); }
-        .modal-content h2 { margin-bottom: 20px; }
-        .modal-buttons { display: flex; gap: 15px; justify-content: center; }
+        .fab svg { width: 24px; height: 24px; pointer-events: none; } /* Prevent SVG from capturing events */
+        .fab.dragging { cursor: grabbing; transform: scale(1.1); box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
 
         @media (max-width: 768px) {
             body { padding: 0; } .container { padding: 10px; }
@@ -150,7 +146,7 @@
                 <ol>
                     <li>Load a project file, or upload a new curriculum image.</li>
                     <li>Add/edit cards and their occlusions.</li>
-                    <li><strong>On Mobile/Touch:</strong> Use the floating pencil button to toggle Draw Mode.</li>
+                    <li><strong>On Mobile/Touch:</strong> Use the floating pencil button to toggle Draw Mode. You can drag this button if it gets in the way.</li>
                     <li>Save your project to resume later.</li>
                     <li>Click "Start Study" when you're ready.</li>
                 </ol>
@@ -175,19 +171,32 @@
 
         <div id="studyView" class="hidden">
             <div class="study-progress"> <div id="studyCardIndicator">Studying: Card 1</div> <div id="progressText">Progress: 0 / 0</div> <div class="progress-bar"> <div class="progress-fill" id="progressFill"></div> </div> </div>
-            <div class="study-controls"> <p>Tap the pulsing box to reveal it.</p> </div>
+            <div class="study-controls">
+                <p id="studyInstructions">Tap the pulsing box to reveal it.</p>
+                <div id="completionControls" class="hidden">
+                    <h3>🎉 Study Complete!</h3>
+                    <div class="completion-controls-buttons">
+                        <button class="btn" onclick="repeatSession()">Repeat Session</button>
+                        <button class="btn secondary" onclick="endSession()">Back to Setup</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="image-wrapper-center" id="imageContainerWrapper"></div>
     </div>
 
-    <!-- MODAL -->
-    <div class="modal-overlay hidden" id="completionModal"> <div class="modal-content"> <h2>🎉 Study Complete!</h2> <div class="modal-buttons"> <button class="btn" onclick="repeatSession()">Repeat Session</button> <button class="btn secondary" onclick="endSession()">Back to Setup</button> </div> </div> </div>
-
     <!-- FLOATING ACTION BUTTON -->
-    <div class="fab-container hidden" id="fabContainer"> <button class="fab" id="drawModeToggle" onclick="toggleDrawMode(this)" title="Toggle Draw Mode"> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"> <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/> </svg> </button> </div>
+    <div class="fab-container" id="fabContainer">
+        <button class="fab" id="drawModeToggle" title="Toggle Draw Mode (Click to toggle, drag to move)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/>
+            </svg>
+        </button>
+    </div>
 
     <script>
+        // --- Existing Variables ---
         let currentMode = 'setup';
         let isDrawing = false;
         let isDrawModeActive = !isTouchDevice();
@@ -197,50 +206,30 @@
         let currentImageElement = null;
         let activeCardId = null;
         let studyState = { cardIndex: 0, occlusionIndex: 0, totalRevealed: 0 };
-
         const cardColors = ['#4a90e2', '#e25a4a', '#f5a623', '#7ed321', '#bd10e0', '#4a4a4a', '#9013fe', '#50e3c2'];
 
+        // --- Core Functions ---
         function isTouchDevice() { return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0); }
 
-        function toggleDrawMode(button) {
+        function toggleDrawMode() {
             isDrawModeActive = !isDrawModeActive;
+            const button = document.getElementById('drawModeToggle');
             button.classList.toggle('active', isDrawModeActive);
             document.getElementById('imageWrapper')?.classList.toggle('draw-active', isDrawModeActive);
         }
 
         async function saveProject() {
-            if (!currentImageElement) {
-                alert("Please load an image before saving.");
-                return;
-            }
-
-            const projectData = {
-                imageData: currentImageElement.src,
-                occlusions: occlusionsByCard,
-                cardOrder: cardOrder
-            };
+            if (!currentImageElement) { alert("Please load an image before saving."); return; }
+            const projectData = { imageData: currentImageElement.src, occlusions: occlusionsByCard, cardOrder: cardOrder };
             const jsonString = JSON.stringify(projectData, null, 2);
             const blob = new Blob([jsonString], { type: "application/json" });
-
             if (window.showSaveFilePicker) {
                 try {
-                    const options = {
-                        suggestedName: `project-${Date.now()}.ioproject`,
-                        types: [{
-                            description: 'Image Occlusion Project',
-                            accept: { 'application/json': ['.ioproject'] },
-                        }],
-                    };
-                    const handle = await window.showSaveFilePicker(options);
+                    const handle = await window.showSaveFilePicker({ suggestedName: `project-${Date.now()}.ioproject`, types: [{ description: 'Image Occlusion Project', accept: { 'application/json': ['.ioproject'] } }] });
                     const writable = await handle.createWritable();
                     await writable.write(blob);
                     await writable.close();
-                } catch (err) {
-                    if (err.name !== 'AbortError') {
-                        console.error("Error saving file:", err);
-                        alert("Could not save the project file.");
-                    }
-                }
+                } catch (err) { if (err.name !== 'AbortError') { console.error("Error saving file:", err); alert("Could not save the project file."); } }
             } else {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -253,27 +242,18 @@
             }
         }
 
-        function loadProject() {
-            document.getElementById('loadProjectInput').click();
-        }
+        function loadProject() { document.getElementById('loadProjectInput').click(); }
 
         function handleProjectFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const projectData = JSON.parse(e.target.result);
-                    if (projectData.imageData && projectData.occlusions && projectData.cardOrder) {
-                        rebuildState(projectData);
-                    } else {
-                        alert("Invalid project file format.");
-                    }
-                } catch (error) {
-                    console.error("Error parsing project file:", error);
-                    alert("Could not load the project file. It may be corrupted.");
-                }
+                    if (projectData.imageData && projectData.occlusions && projectData.cardOrder) { rebuildState(projectData); } 
+                    else { alert("Invalid project file format."); }
+                } catch (error) { console.error("Error parsing project file:", error); alert("Could not load the project file. It may be corrupted."); }
             };
             reader.readAsText(file);
             event.target.value = '';
@@ -285,19 +265,15 @@
             occlusionsByCard = data.occlusions;
             cardOrder = data.cardOrder;
             activeCardId = cardOrder.length > 0 ? cardOrder[0] : null;
-
             const imageWrapper = document.getElementById('imageWrapper');
             cardOrder.forEach(cardId => {
                 if (occlusionsByCard[cardId]) {
                     occlusionsByCard[cardId].forEach(occ => {
-                        const start = { x: occ.left, y: occ.top };
-                        const end = { x: occ.left + occ.width, y: occ.top + occ.height };
-                        const box = createOcclusionElement(start, end, cardId, false, occ.id);
+                        const box = createOcclusionElement({ x: occ.left, y: occ.top }, { x: occ.left + occ.width, y: occ.top + occ.height }, cardId, false, occ.id);
                         imageWrapper.appendChild(box);
                     });
                 }
             });
-
             updateCardSelectors();
             renumberOcclusionBoxes();
         }
@@ -308,17 +284,11 @@
             e.preventDefault();
             e.currentTarget.classList.remove('dragover');
             const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
-                resetTool();
-                loadImage(file);
-            }
+            if (file && file.type.startsWith('image/')) { resetTool(); loadImage(file); }
         }
         function handleImageUpload(e) {
             const file = e.target.files[0];
-            if (file && file.type.startsWith('image/')) {
-                resetTool();
-                loadImage(file);
-            }
+            if (file && file.type.startsWith('image/')) { resetTool(); loadImage(file); }
         }
         function loadImage(file) {
             const reader = new FileReader();
@@ -328,28 +298,24 @@
         function displayImage(src) {
             const container = document.getElementById('imageContainerWrapper');
             container.innerHTML = `<div class="image-container" id="imageWrapper"><img src="${src}" alt="Curriculum" class="curriculum-image" id="curriculumImg"></div>`;
-            
             currentImageElement = document.getElementById('curriculumImg');
             const imageWrapper = document.getElementById('imageWrapper');
             setupDrawingListeners(imageWrapper);
-            
             document.getElementById('toggleModeBtn').disabled = false;
             document.getElementById('saveProjectBtn').disabled = false;
             document.getElementById('uploadText').innerHTML = '<p>✓ Image loaded. Add cards and occlusions.</p>';
             document.getElementById('cardControls').classList.remove('hidden');
-
             const fabContainer = document.getElementById('fabContainer');
             fabContainer.classList.remove('hidden');
             const fab = document.getElementById('drawModeToggle');
             isDrawModeActive = !isTouchDevice();
             fab.classList.toggle('active', isDrawModeActive);
             imageWrapper.classList.toggle('draw-active', isDrawModeActive);
-
             if (Object.keys(occlusionsByCard).length === 0) addCard();
         }
 
-        function getEventPosition(event) {
-            const rect = event.currentTarget.getBoundingClientRect();
+        function getEventPosition(event, target) {
+            const rect = target.getBoundingClientRect();
             const touch = event.touches?.[0] || event;
             return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
         }
@@ -368,13 +334,13 @@
             if (currentMode !== 'setup' || !activeCardId || !isDrawModeActive) return;
             e.preventDefault();
             isDrawing = true;
-            startPos = getEventPosition(e);
+            startPos = getEventPosition(e, e.currentTarget);
         }
         
         function drawOcclusion(e) {
             if (!isDrawing) return;
             e.preventDefault();
-            const currentPos = getEventPosition(e);
+            const currentPos = getEventPosition(e, e.currentTarget);
             let tempBox = e.currentTarget.querySelector('.temp-occlusion-box');
             if (tempBox) tempBox.remove();
             const box = createOcclusionElement(startPos, currentPos, activeCardId, true);
@@ -386,9 +352,8 @@
             isDrawing = false;
             const tempBox = document.querySelector('.temp-occlusion-box');
             if (tempBox) tempBox.remove();
-            const rect = e.currentTarget.getBoundingClientRect();
             const touch = e.changedTouches?.[0] || e;
-            const endPos = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+            const endPos = getEventPosition(touch, e.currentTarget);
             if (Math.hypot(endPos.x - startPos.x, endPos.y - startPos.y) > 10) {
                 createOcclusion(startPos, endPos);
             }
@@ -463,6 +428,8 @@
             document.getElementById('setupView').classList.add('hidden');
             document.getElementById('studyView').classList.remove('hidden');
             document.getElementById('fabContainer').classList.add('hidden');
+            document.getElementById('studyInstructions').classList.remove('hidden');
+            document.getElementById('completionControls').classList.add('hidden');
             const wrapper = document.getElementById('imageWrapper');
             if (wrapper) {
                 const newWrapper = wrapper.cloneNode(true);
@@ -474,14 +441,10 @@
         }
 
         function endSession() {
-            document.getElementById('completionModal').classList.add('hidden');
             const imgElement = document.getElementById('curriculumImg');
             if(imgElement && imgElement.src) {
-                const projectData = { imageData: imgElement.src, occlusions: occlusionsByCard, cardOrder: cardOrder };
-                rebuildState(projectData);
-            } else {
-                 resetTool();
-            }
+                rebuildState({ imageData: imgElement.src, occlusions: occlusionsByCard, cardOrder: cardOrder });
+            } else { resetTool(); }
         }
         
         function updateOcclusionDisplay() {
@@ -500,14 +463,16 @@
         }
 
         function revealCurrentOcclusion() {
-            studyState.occlusionIndex++;
+            const currentBox = document.querySelector('.occlusion-box.current');
+            if (currentBox) { currentBox.style.display = 'none'; currentBox.classList.remove('current'); }
             studyState.totalRevealed++;
+            updateStudyProgress();
             const nonEmptyCardOrder = cardOrder.filter(id => occlusionsByCard[id]?.length > 0);
             const currentCardId = nonEmptyCardOrder[studyState.cardIndex];
             const currentCardOcclusions = occlusionsByCard[currentCardId] || [];
+            studyState.occlusionIndex++;
             if (studyState.occlusionIndex >= currentCardOcclusions.length) { studyState.cardIndex++; studyState.occlusionIndex = 0; }
-            updateStudyProgress();
-            if (studyState.cardIndex >= nonEmptyCardOrder.length) { updateOcclusionDisplay(); setTimeout(showCompletionModal, 300); } 
+            if (studyState.cardIndex >= nonEmptyCardOrder.length) { showCompletionControls(); } 
             else { updateOcclusionDisplay(); }
         }
 
@@ -518,8 +483,19 @@
             document.getElementById('progressFill').style.width = percentage + '%';
         }
 
-        function showCompletionModal() { document.getElementById('completionModal').classList.remove('hidden'); }
-        function repeatSession() { document.getElementById('completionModal').classList.add('hidden'); studyState = { cardIndex: 0, occlusionIndex: 0, totalRevealed: 0 }; updateOcclusionDisplay(); updateStudyProgress(); }
+        function showCompletionControls() {
+            document.getElementById('studyInstructions').classList.add('hidden');
+            document.getElementById('completionControls').classList.remove('hidden');
+        }
+
+        function repeatSession() {
+            document.getElementById('studyInstructions').classList.remove('hidden');
+            document.getElementById('completionControls').classList.add('hidden');
+            studyState = { cardIndex: 0, occlusionIndex: 0, totalRevealed: 0 };
+            document.querySelectorAll('.occlusion-box').forEach(box => { box.style.display = 'flex'; });
+            updateOcclusionDisplay();
+            updateStudyProgress();
+        }
         
         function resetTool() {
             currentMode = 'setup';
@@ -539,16 +515,84 @@
             document.getElementById('setupView').classList.remove('hidden');
             document.getElementById('studyView').classList.add('hidden');
             document.getElementById('cardControls').classList.add('hidden');
-            document.getElementById('completionModal').classList.add('hidden');
             document.getElementById('fabContainer').classList.add('hidden');
         }
 
+        // --- NEW: Draggable FAB Logic ---
+        function makeFabDraggable() {
+            const fabContainer = document.getElementById('fabContainer');
+            const fab = document.getElementById('drawModeToggle');
+            let isDragging = false;
+            let hasMoved = false;
+            let offsetX, offsetY;
+
+            const startDrag = (e) => {
+                isDragging = true;
+                hasMoved = false;
+                fab.classList.add('dragging');
+                
+                const touch = e.touches ? e.touches[0] : e;
+                const rect = fabContainer.getBoundingClientRect();
+                offsetX = touch.clientX - rect.left;
+                offsetY = touch.clientY - rect.top;
+
+                // Remove bottom/right positioning to use top/left for dragging
+                fabContainer.style.right = 'auto';
+                fabContainer.style.bottom = 'auto';
+            };
+
+            const drag = (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                hasMoved = true;
+                
+                const touch = e.touches ? e.touches[0] : e;
+                let newX = touch.clientX - offsetX;
+                let newY = touch.clientY - offsetY;
+
+                // Constrain to viewport
+                const containerWidth = fabContainer.offsetWidth;
+                const containerHeight = fabContainer.offsetHeight;
+                newX = Math.max(0, Math.min(newX, window.innerWidth - containerWidth));
+                newY = Math.max(0, Math.min(newY, window.innerHeight - containerHeight));
+
+                fabContainer.style.left = `${newX}px`;
+                fabContainer.style.top = `${newY}px`;
+            };
+
+            const endDrag = () => {
+                isDragging = false;
+                fab.classList.remove('dragging');
+            };
+
+            fab.addEventListener('mousedown', startDrag);
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', endDrag);
+
+            fab.addEventListener('touchstart', startDrag, { passive: true });
+            document.addEventListener('touchmove', drag, { passive: false });
+            document.addEventListener('touchend', endDrag);
+
+            // This prevents the click from firing after a drag
+            fab.addEventListener('click', (e) => {
+                if (hasMoved) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                } else {
+                    // This is a genuine click, so call the original function
+                    toggleDrawMode();
+                }
+            });
+        }
+        
+        // --- Initialization ---
         resetTool();
+        makeFabDraggable(); // Initialize the draggable behavior
         isDrawModeActive = !isTouchDevice();
     </script>
 
-    <!-- PWA Service Worker Registration -->
-    <script src="sw-register.js"></script>
+    <!-- PWA Service Worker Registration (optional, can be removed if not needed) -->
+   <script src="sw-register.js"></script> 
 
 </body>
 </html>
