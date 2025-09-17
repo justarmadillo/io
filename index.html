@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Occlusion Pre-Study Tool</title>
+
+    <!-- PWA Manifest and Theme Color -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4a90e2"/>
+    <link rel="apple-touch-icon" href="icon-192.png"> <!-- For iOS -->
+
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --primary-hover: #357abd;
+            --secondary-color: #6c757d;
+            --secondary-hover: #5a6268;
+            --success-color: #28a745;
+            --success-hover: #218838;
+            --danger-color: #e25a4a;
+            --background-dark: #121212;
+            --surface-dark: #1e1e1e;
+            --text-light: #e0e0e0;
+            --border-color: #444;
+            --pulse-color: rgba(226, 90, 74, 0.7);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--background-dark);
+            color: var(--text-light);
+            min-height: 100vh;
+        }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px 20px;
+            background: linear-gradient(145deg, #2a2a2a, var(--surface-dark));
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .mode-indicator { padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 14px; white-space: nowrap; transition: all 0.3s ease; }
+        .mode-setup { background: var(--primary-color); }
+        .mode-study { background: var(--danger-color); }
+        
+        .controls, .card-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .card-controls { background: var(--surface-dark); padding: 15px; border-radius: 8px; margin-bottom: 20px; justify-content: flex-start; border: 1px solid var(--border-color); }
+        .card-controls label { font-weight: 500; }
+        
+        .btn, select {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        select {
+             -webkit-appearance: none; -moz-appearance: none; appearance: none;
+             padding: 10px 35px 10px 10px;
+             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' class='bi bi-chevron-down' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+             background-repeat: no-repeat;
+             background-position: right 10px center;
+        }
+        
+        .btn:hover { filter: brightness(1.1); }
+        .btn:disabled { background: #555; cursor: not-allowed; filter: none; }
+        .btn.secondary { background: var(--secondary-color); }
+        .btn.success { background: var(--success-color); }
+
+        .upload-area { border: 2px dashed var(--border-color); border-radius: 12px; padding: 40px; text-align: center; margin-bottom: 20px; transition: all 0.2s ease; cursor: pointer; background: var(--surface-dark); }
+        .upload-area:hover { border-color: var(--primary-color); }
+        .upload-area.dragover { border-color: var(--primary-color); background: rgba(74, 144, 226, 0.1); }
+        
+        .image-container { position: relative; display: inline-block; max-width: 100%; background: var(--surface-dark); border-radius: 8px; overflow: hidden; user-select: none; border: 2px solid transparent; transition: border-color 0.3s ease; }
+        .image-container.draw-active { border-color: var(--primary-color); }
+        .image-wrapper-center { text-align: center; margin-top: 20px; }
+        .curriculum-image { max-width: 100%; height: auto; display: block; }
+        
+        .occlusion-box { position: absolute; background: #333; border: 2px solid #fff; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border-radius: 4px; }
+        .occlusion-box.current { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--pulse-color); } 70% { box-shadow: 0 0 10px 10px rgba(226, 90, 74, 0); } 100% { box-shadow: 0 0 0 0 rgba(226, 90, 74, 0); } }
+        
+        .study-progress, .study-controls { background: var(--surface-dark); padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; border: 1px solid var(--border-color); }
+        .progress-bar { width: 100%; height: 8px; background: #444; border-radius: 4px; overflow: hidden; margin: 10px 0; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #4a90e2, #4caf50); width: 0%; transition: width 0.3s ease; }
+        
+        .instructions { background: var(--surface-dark); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border-color); }
+        .instructions ol { padding-left: 20px; }
+        
+        #fileInput, #loadProjectInput { display: none; }
+        .hidden { display: none !important; }
+        
+        .fab-container { position: fixed; bottom: 20px; right: 20px; z-index: 999; }
+        .fab { width: 56px; height: 56px; border-radius: 50%; background-color: var(--secondary-color); color: white; border: none; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer; transition: background-color 0.3s ease, transform 0.2s ease; }
+        .fab:hover { transform: scale(1.05); }
+        .fab.active { background-color: var(--primary-color); }
+        .fab svg { width: 24px; height: 24px; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .modal-overlay:not(.hidden) { opacity: 1; pointer-events: auto; }
+        .modal-content { background: var(--surface-dark); padding: 30px; border-radius: 12px; text-align: center; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); }
+        .modal-content h2 { margin-bottom: 20px; }
+        .modal-buttons { display: flex; gap: 15px; justify-content: center; }
+
+        @media (max-width: 768px) {
+            body { padding: 0; } .container { padding: 10px; }
+            .header { flex-direction: column; align-items: stretch; text-align: center; }
+            .controls, .card-controls { justify-content: center; }
+            .btn, select { padding: 12px 16px; font-size: 14px; }
+            .upload-area { padding: 25px; }
+            .instructions, .card-controls, .study-progress { padding: 12px; }
+            .fab-container { bottom: 15px; right: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="mode-indicator" id="modeIndicator">SETUP MODE</div>
+            <div class="controls">
+                <button class="btn success" onclick="loadProject()">Load Project</button>
+                <button class="btn" id="saveProjectBtn" onclick="saveProject()" disabled>Save Project</button>
+                <button class="btn secondary" onclick="resetTool()">Reset</button>
+                <button class="btn" id="toggleModeBtn" onclick="toggleMode()" disabled>Start Study</button>
+            </div>
+        </div>
+
+        <div id="setupView">
+             <div class="instructions">
+                <h3>Setup Instructions:</h3>
+                <ol>
+                    <li>Load a project file, or upload a new curriculum image.</li>
+                    <li>Add/edit cards and their occlusions.</li>
+                    <li><strong>On Mobile/Touch:</strong> Use the floating pencil button to toggle Draw Mode.</li>
+                    <li>Save your project to resume later.</li>
+                    <li>Click "Start Study" when you're ready.</li>
+                </ol>
+            </div>
+
+            <div class="card-controls hidden" id="cardControls">
+                <button class="btn" onclick="addCard()">+ Add Card</button>
+                <label for="cardSelector">Active Card:</label>
+                <select id="cardSelector" onchange="switchActiveCard(this.value)"></select>
+            </div>
+
+            <div class="upload-area" onclick="document.getElementById('fileInput').click()" 
+                 ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+                <div id="uploadText">
+                    <h3>Upload Curriculum Image</h3>
+                    <p>Click here, drag and drop an image, or load a project</p>
+                </div>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" onchange="handleImageUpload(event)">
+            <input type="file" id="loadProjectInput" accept=".ioproject" onchange="handleProjectFileSelect(event)">
+        </div>
+
+        <div id="studyView" class="hidden">
+            <div class="study-progress"> <div id="studyCardIndicator">Studying: Card 1</div> <div id="progressText">Progress: 0 / 0</div> <div class="progress-bar"> <div class="progress-fill" id="progressFill"></div> </div> </div>
+            <div class="study-controls"> <p>Tap the pulsing box to reveal it.</p> </div>
+        </div>
+
+        <div class="image-wrapper-center" id="imageContainerWrapper"></div>
+    </div>
+
+    <!-- MODAL -->
+    <div class="modal-overlay hidden" id="completionModal"> <div class="modal-content"> <h2>🎉 Study Complete!</h2> <div class="modal-buttons"> <button class="btn" onclick="repeatSession()">Repeat Session</button> <button class="btn secondary" onclick="endSession()">Back to Setup</button> </div> </div> </div>
+
+    <!-- FLOATING ACTION BUTTON -->
+    <div class="fab-container hidden" id="fabContainer"> <button class="fab" id="drawModeToggle" onclick="toggleDrawMode(this)" title="Toggle Draw Mode"> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"> <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/> </svg> </button> </div>
+
+    <script>
+        let currentMode = 'setup';
+        let isDrawing = false;
+        let isDrawModeActive = !isTouchDevice();
+        let startPos = { x: 0, y: 0 };
+        let occlusionsByCard = {}; 
+        let cardOrder = [];
+        let currentImageElement = null;
+        let activeCardId = null;
+        let studyState = { cardIndex: 0, occlusionIndex: 0, totalRevealed: 0 };
+
+        const cardColors = ['#4a90e2', '#e25a4a', '#f5a623', '#7ed321', '#bd10e0', '#4a4a4a', '#9013fe', '#50e3c2'];
+
+        function isTouchDevice() { return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0); }
+
+        function toggleDrawMode(button) {
+            isDrawModeActive = !isDrawModeActive;
+            button.classList.toggle('active', isDrawModeActive);
+            document.getElementById('imageWrapper')?.classList.toggle('draw-active', isDrawModeActive);
+        }
+
+        async function saveProject() {
+            if (!currentImageElement) {
+                alert("Please load an image before saving.");
+                return;
+            }
+
+            const projectData = {
+                imageData: currentImageElement.src,
+                occlusions: occlusionsByCard,
+                cardOrder: cardOrder
+            };
+            const jsonString = JSON.stringify(projectData, null, 2);
+            const blob = new Blob([jsonString], { type: "application/json" });
+
+            if (window.showSaveFilePicker) {
+                try {
+                    const options = {
+                        suggestedName: `project-${Date.now()}.ioproject`,
+                        types: [{
+                            description: 'Image Occlusion Project',
+                            accept: { 'application/json': ['.ioproject'] },
+                        }],
+                    };
+                    const handle = await window.showSaveFilePicker(options);
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error("Error saving file:", err);
+                        alert("Could not save the project file.");
+                    }
+                }
+            } else {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `project-${Date.now()}.ioproject`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        function loadProject() {
+            document.getElementById('loadProjectInput').click();
+        }
+
+        function handleProjectFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const projectData = JSON.parse(e.target.result);
+                    if (projectData.imageData && projectData.occlusions && projectData.cardOrder) {
+                        rebuildState(projectData);
+                    } else {
+                        alert("Invalid project file format.");
+                    }
+                } catch (error) {
+                    console.error("Error parsing project file:", error);
+                    alert("Could not load the project file. It may be corrupted.");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function rebuildState(data) {
+            resetTool();
+            displayImage(data.imageData);
+            occlusionsByCard = data.occlusions;
+            cardOrder = data.cardOrder;
+            activeCardId = cardOrder.length > 0 ? cardOrder[0] : null;
+
+            const imageWrapper = document.getElementById('imageWrapper');
+            cardOrder.forEach(cardId => {
+                if (occlusionsByCard[cardId]) {
+                    occlusionsByCard[cardId].forEach(occ => {
+                        const start = { x: occ.left, y: occ.top };
+                        const end = { x: occ.left + occ.width, y: occ.top + occ.height };
+                        const box = createOcclusionElement(start, end, cardId, false, occ.id);
+                        imageWrapper.appendChild(box);
+                    });
+                }
+            });
+
+            updateCardSelectors();
+            renumberOcclusionBoxes();
+        }
+
+        function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('dragover'); }
+        function handleDragLeave(e) { e.preventDefault(); e.currentTarget.classList.remove('dragover'); }
+        function handleDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                resetTool();
+                loadImage(file);
+            }
+        }
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                resetTool();
+                loadImage(file);
+            }
+        }
+        function loadImage(file) {
+            const reader = new FileReader();
+            reader.onload = e => displayImage(e.target.result);
+            reader.readAsDataURL(file);
+        }
+        function displayImage(src) {
+            const container = document.getElementById('imageContainerWrapper');
+            container.innerHTML = `<div class="image-container" id="imageWrapper"><img src="${src}" alt="Curriculum" class="curriculum-image" id="curriculumImg"></div>`;
+            
+            currentImageElement = document.getElementById('curriculumImg');
+            const imageWrapper = document.getElementById('imageWrapper');
+            setupDrawingListeners(imageWrapper);
+            
+            document.getElementById('toggleModeBtn').disabled = false;
+            document.getElementById('saveProjectBtn').disabled = false;
+            document.getElementById('uploadText').innerHTML = '<p>✓ Image loaded. Add cards and occlusions.</p>';
+            document.getElementById('cardControls').classList.remove('hidden');
+
+            const fabContainer = document.getElementById('fabContainer');
+            fabContainer.classList.remove('hidden');
+            const fab = document.getElementById('drawModeToggle');
+            isDrawModeActive = !isTouchDevice();
+            fab.classList.toggle('active', isDrawModeActive);
+            imageWrapper.classList.toggle('draw-active', isDrawModeActive);
+
+            if (Object.keys(occlusionsByCard).length === 0) addCard();
+        }
+
+        function getEventPosition(event) {
+            const rect = event.currentTarget.getBoundingClientRect();
+            const touch = event.touches?.[0] || event;
+            return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+        }
+
+        function setupDrawingListeners(wrapper) {
+            wrapper.addEventListener('mousedown', startDrawing);
+            wrapper.addEventListener('mousemove', drawOcclusion);
+            wrapper.addEventListener('mouseup', endDrawing);
+            wrapper.addEventListener('mouseleave', endDrawing);
+            wrapper.addEventListener('touchstart', startDrawing, { passive: false });
+            wrapper.addEventListener('touchmove', drawOcclusion, { passive: false });
+            wrapper.addEventListener('touchend', endDrawing);
+        }
+        
+        function startDrawing(e) {
+            if (currentMode !== 'setup' || !activeCardId || !isDrawModeActive) return;
+            e.preventDefault();
+            isDrawing = true;
+            startPos = getEventPosition(e);
+        }
+        
+        function drawOcclusion(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const currentPos = getEventPosition(e);
+            let tempBox = e.currentTarget.querySelector('.temp-occlusion-box');
+            if (tempBox) tempBox.remove();
+            const box = createOcclusionElement(startPos, currentPos, activeCardId, true);
+            e.currentTarget.appendChild(box);
+        }
+
+        function endDrawing(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+            const tempBox = document.querySelector('.temp-occlusion-box');
+            if (tempBox) tempBox.remove();
+            const rect = e.currentTarget.getBoundingClientRect();
+            const touch = e.changedTouches?.[0] || e;
+            const endPos = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+            if (Math.hypot(endPos.x - startPos.x, endPos.y - startPos.y) > 10) {
+                createOcclusion(startPos, endPos);
+            }
+        }
+        
+        function addCard() {
+            const cardId = `card_${Date.now()}`;
+            occlusionsByCard[cardId] = [];
+            cardOrder.push(cardId);
+            activeCardId = cardId;
+            updateCardSelectors();
+        }
+        function switchActiveCard(cardId) { activeCardId = cardId; }
+
+        function createOcclusion(start, end) {
+            if (!activeCardId) return;
+            const occlusion = { id: Date.now(), cardId: activeCardId, left: Math.min(start.x, end.x), top: Math.min(start.y, end.y), width: Math.abs(end.x - start.x), height: Math.abs(end.y - start.y) };
+            occlusionsByCard[activeCardId].push(occlusion);
+            const box = createOcclusionElement(start, end, activeCardId, false, occlusion.id);
+            document.getElementById('imageWrapper').appendChild(box);
+            renumberOcclusionBoxes();
+        }
+        function removeOcclusion(occlusionId, cardId) {
+            occlusionsByCard[cardId] = occlusionsByCard[cardId].filter(o => o.id !== occlusionId);
+            document.querySelector(`[data-occlusion-id="${occlusionId}"]`).remove();
+            renumberOcclusionBoxes();
+        }
+
+        function createOcclusionElement(start, end, cardId, isTemp, occlusionId = null) {
+            const box = document.createElement('div');
+            box.className = isTemp ? 'occlusion-box temp-occlusion-box' : 'occlusion-box';
+            const cardIndex = cardOrder.indexOf(cardId);
+            box.style.backgroundColor = cardColors[cardIndex % cardColors.length];
+            box.style.left = `${Math.min(start.x, end.x)}px`;
+            box.style.top = `${Math.min(start.y, end.y)}px`;
+            box.style.width = `${Math.abs(end.x - start.x)}px`;
+            box.style.height = `${Math.abs(end.y - start.y)}px`;
+            if (!isTemp && occlusionId) {
+                box.dataset.occlusionId = occlusionId;
+                box.dataset.cardId = cardId;
+                box.addEventListener('click', (e) => { e.stopPropagation(); if (currentMode === 'setup') removeOcclusion(occlusionId, cardId); });
+            }
+            return box;
+        }
+        function renumberOcclusionBoxes() {
+            cardOrder.forEach(cardId => {
+                if (occlusionsByCard[cardId]) {
+                    occlusionsByCard[cardId].forEach((occ, index) => {
+                        const box = document.querySelector(`[data-occlusion-id="${occ.id}"]`);
+                        if (box) box.innerHTML = `#${index + 1}`;
+                    });
+                }
+            });
+        }
+        function updateCardSelectors() {
+            const selector = document.getElementById('cardSelector');
+            selector.innerHTML = '';
+            cardOrder.forEach((cardId, index) => selector.add(new Option(`Card ${index + 1}`, cardId)));
+            selector.value = activeCardId;
+        }
+
+        function toggleMode() { if (currentMode === 'setup') startStudyMode(); else endSession(); }
+        
+        function startStudyMode() {
+            const totalOcclusions = cardOrder.flatMap(id => occlusionsByCard[id]).length;
+            if (totalOcclusions === 0) { alert('Create at least one occlusion box on any card first!'); return; }
+            currentMode = 'study';
+            studyState = { cardIndex: 0, occlusionIndex: 0, totalRevealed: 0 };
+            document.getElementById('modeIndicator').className = 'mode-indicator mode-study';
+            document.getElementById('modeIndicator').textContent = 'STUDY MODE';
+            document.getElementById('toggleModeBtn').textContent = 'Back to Setup';
+            document.getElementById('setupView').classList.add('hidden');
+            document.getElementById('studyView').classList.remove('hidden');
+            document.getElementById('fabContainer').classList.add('hidden');
+            const wrapper = document.getElementById('imageWrapper');
+            if (wrapper) {
+                const newWrapper = wrapper.cloneNode(true);
+                wrapper.parentNode.replaceChild(newWrapper, wrapper);
+                newWrapper.querySelectorAll('.occlusion-box').forEach(box => { box.addEventListener('click', (e) => { e.stopPropagation(); if (box.classList.contains('current')) revealCurrentOcclusion(); }); });
+            }
+            updateOcclusionDisplay();
+            updateStudyProgress();
+        }
+
+        function endSession() {
+            document.getElementById('completionModal').classList.add('hidden');
+            const imgElement = document.getElementById('curriculumImg');
+            if(imgElement && imgElement.src) {
+                const projectData = { imageData: imgElement.src, occlusions: occlusionsByCard, cardOrder: cardOrder };
+                rebuildState(projectData);
+            } else {
+                 resetTool();
+            }
+        }
+        
+        function updateOcclusionDisplay() {
+            const nonEmptyCardOrder = cardOrder.filter(id => occlusionsByCard[id]?.length > 0);
+            if (studyState.cardIndex >= nonEmptyCardOrder.length) return;
+            const currentCardId = nonEmptyCardOrder[studyState.cardIndex];
+            const currentCardOcclusions = occlusionsByCard[currentCardId];
+            const originalCardIndex = cardOrder.indexOf(currentCardId);
+            document.getElementById('studyCardIndicator').textContent = `Studying: Card ${originalCardIndex + 1}`;
+            document.querySelectorAll('.occlusion-box').forEach(box => {
+                if (box.dataset.cardId !== currentCardId) { box.style.display = 'none'; return; }
+                const occlusionIndex = currentCardOcclusions.findIndex(o => o.id == box.dataset.occlusionId);
+                if (occlusionIndex < studyState.occlusionIndex) { box.style.display = 'none'; } 
+                else { box.style.display = 'flex'; box.classList.toggle('current', occlusionIndex === studyState.occlusionIndex); }
+            });
+        }
+
+        function revealCurrentOcclusion() {
+            studyState.occlusionIndex++;
+            studyState.totalRevealed++;
+            const nonEmptyCardOrder = cardOrder.filter(id => occlusionsByCard[id]?.length > 0);
+            const currentCardId = nonEmptyCardOrder[studyState.cardIndex];
+            const currentCardOcclusions = occlusionsByCard[currentCardId] || [];
+            if (studyState.occlusionIndex >= currentCardOcclusions.length) { studyState.cardIndex++; studyState.occlusionIndex = 0; }
+            updateStudyProgress();
+            if (studyState.cardIndex >= nonEmptyCardOrder.length) { updateOcclusionDisplay(); setTimeout(showCompletionModal, 300); } 
+            else { updateOcclusionDisplay(); }
+        }
+
+        function updateStudyProgress() {
+            const totalOcclusions = cardOrder.flatMap(id => occlusionsByCard[id] || []).length;
+            const percentage = totalOcclusions > 0 ? (studyState.totalRevealed / totalOcclusions) * 100 : 0;
+            document.getElementById('progressText').textContent = `Progress: ${studyState.totalRevealed} / ${totalOcclusions}`;
+            document.getElementById('progressFill').style.width = percentage + '%';
+        }
+
+        function showCompletionModal() { document.getElementById('completionModal').classList.remove('hidden'); }
+        function repeatSession() { document.getElementById('completionModal').classList.add('hidden'); studyState = { cardIndex: 0, occlusionIndex: 0, totalRevealed: 0 }; updateOcclusionDisplay(); updateStudyProgress(); }
+        
+        function resetTool() {
+            currentMode = 'setup';
+            isDrawing = false;
+            occlusionsByCard = {};
+            cardOrder = [];
+            currentImageElement = null;
+            activeCardId = null;
+            document.getElementById('imageContainerWrapper').innerHTML = '';
+            document.getElementById('fileInput').value = '';
+            document.getElementById('uploadText').innerHTML = `<h3>Upload Curriculum Image</h3><p>Click here, drag and drop an image, or load a project</p>`;
+            document.getElementById('modeIndicator').className = 'mode-indicator mode-setup';
+            document.getElementById('modeIndicator').textContent = 'SETUP MODE';
+            document.getElementById('toggleModeBtn').textContent = 'Start Study';
+            document.getElementById('toggleModeBtn').disabled = true;
+            document.getElementById('saveProjectBtn').disabled = true;
+            document.getElementById('setupView').classList.remove('hidden');
+            document.getElementById('studyView').classList.add('hidden');
+            document.getElementById('cardControls').classList.add('hidden');
+            document.getElementById('completionModal').classList.add('hidden');
+            document.getElementById('fabContainer').classList.add('hidden');
+        }
+
+        resetTool();
+        isDrawModeActive = !isTouchDevice();
+    </script>
+
+    <!-- PWA Service Worker Registration -->
+    <script src="sw-register.js"></script>
+
+</body>
+</html>
